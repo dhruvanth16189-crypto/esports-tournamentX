@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LogIn, Loader2, LogOut, User as UserIcon, Shield } from 'lucide-react';
-import { auth, provider, signInWithRedirect, getRedirectResult } from '../firebase';
+import { auth, provider, signInWithRedirect, getRedirectResult, onAuthStateChanged } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
 interface LoginProps {
@@ -14,46 +14,41 @@ export default function Login({ onLogin, onLogout, user }: LoginProps) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleRedirectResult = async () => {
+    const processFirebaseUser = async (firebaseUser: any) => {
       setLoading(true);
       try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          const firebaseUser = result.user;
-          
-          console.log(firebaseUser.email);
-          
-          const res = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: firebaseUser.email,
-              displayName: firebaseUser.displayName,
-              uid: firebaseUser.uid
-            })
-          });
-          
-          if (res.ok) {
-            const userData = await res.json();
-            const profile = {
-              email: firebaseUser.email,
-              name: userData.username,
-              virtualBalance: userData.virtualBalance,
-              isAdmin: userData.isAdmin
-            };
-            onLogin(profile);
+        console.log("Processing firebase user: ", firebaseUser.email);
+        
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            uid: firebaseUser.uid
+          })
+        });
+        
+        if (res.ok) {
+          const userData = await res.json();
+          const profile = {
+            email: firebaseUser.email,
+            name: userData.username,
+            virtualBalance: userData.virtualBalance,
+            isAdmin: userData.isAdmin
+          };
+          onLogin(profile);
 
-            if (firebaseUser.email === 'dhruvanth16189@gmail.com') {
-              localStorage.setItem('isAdmin', 'true');
-              localStorage.setItem('userProfile', JSON.stringify(profile));
-              navigate('/admin');
-            } else {
-              localStorage.setItem('userProfile', JSON.stringify(profile));
-              navigate('/dashboard');
-            }
+          if (firebaseUser.email === 'dhruvanth16189@gmail.com') {
+            localStorage.setItem('isAdmin', 'true');
+            localStorage.setItem('userProfile', JSON.stringify(profile));
+            navigate('/admin');
           } else {
-            alert('Failed to login to the server');
+            localStorage.setItem('userProfile', JSON.stringify(profile));
+            navigate('/dashboard');
           }
+        } else {
+          console.error('Failed to login to the server');
         }
       } catch (err) {
         console.error('Login error:', err);
@@ -61,9 +56,34 @@ export default function Login({ onLogin, onLogout, user }: LoginProps) {
         setLoading(false);
       }
     };
+
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          await processFirebaseUser(result.user);
+        }
+      } catch (err) {
+        console.error('Redirect result error:', err);
+      }
+    };
     
     handleRedirectResult();
-  }, [navigate, onLogin]);
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser && !user) {
+        // If we have a user in firebase but not in local state (prevent double processing)
+        // Note: checking !user prevents infinite loops if onLogin causes re-renders
+        // Wait, user is a prop, so this closure might have a stale user if not careful,
+        // but if they are already logged in locally we shouldn't keep hitting the backend.
+        if (!localStorage.getItem('userProfile')) {
+           await processFirebaseUser(firebaseUser);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [navigate, onLogin, user]);
 
   const handleLogin = async () => {
     setLoading(true);
