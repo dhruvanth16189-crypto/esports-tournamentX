@@ -37,6 +37,7 @@ interface Transaction {
   status: 'pending' | 'approved' | 'denied';
   txnID: string;
   upiId?: string;
+  proofImage?: string;
   createdAt: string;
 }
 
@@ -50,7 +51,8 @@ export default function AdminDashboard({
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'tournaments' | 'transactions'>('tournaments');
+  const [activeTab, setActiveTab] = useState<'tournaments' | 'transactions' | 'settings'>('tournaments');
+  const [adminUpiId, setAdminUpiId] = useState('');
   
   // Form State
   const [matchMode, setMatchMode] = useState<keyof typeof MATCH_MODES>('BR');
@@ -69,9 +71,10 @@ export default function AdminDashboard({
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [tRes, trRes] = await Promise.all([
+      const [tRes, trRes, sRes] = await Promise.all([
         fetch(`/api/admin/tournaments?email=${encodeURIComponent(userEmail)}`),
-        fetch(`/api/admin/transactions?email=${encodeURIComponent(userEmail)}`)
+        fetch(`/api/admin/transactions?email=${encodeURIComponent(userEmail)}`),
+        fetch('/api/payment-settings')
       ]);
       
       if (tRes.ok) {
@@ -82,10 +85,28 @@ export default function AdminDashboard({
         const data = await trRes.json();
         setTransactions(data);
       }
+      if (sRes.ok) {
+        const data = await sRes.json();
+        if (data.upiId) setAdminUpiId(data.upiId);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveSettings = async () => {
+    try {
+      const res = await fetch('/api/admin/payment-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail, upiId: adminUpiId })
+      });
+      if (res.ok) alert('Settings saved successfully');
+      else alert('Failed to save settings');
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -178,7 +199,7 @@ export default function AdminDashboard({
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* Header */}
-        <header className="flex items-center justify-between border-b border-neutral-800 pb-6">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-neutral-800 pb-6 gap-4 sm:gap-0">
           <div className="flex items-center gap-4">
             <button 
               onClick={onBack}
@@ -191,17 +212,17 @@ export default function AdminDashboard({
                 <Shield size={20} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-                <p className="text-sm text-neutral-400">Manage tournaments and results</p>
+                <h1 className="text-xl sm:text-2xl font-bold">Admin Dashboard</h1>
+                <p className="text-xs sm:text-sm text-neutral-400">Manage tournaments and results</p>
               </div>
             </div>
           </div>
-          <div className="text-sm bg-neutral-900 px-4 py-2 rounded-full border border-neutral-800 text-neutral-400">
+          <div className="text-xs sm:text-sm bg-neutral-900 px-4 py-2 rounded-full border border-neutral-800 text-neutral-400 self-start sm:self-auto ml-14 sm:ml-0 overflow-hidden text-ellipsis max-w-full">
             {userEmail}
           </div>
         </header>
 
-        <div className="flex border-b border-neutral-800 gap-8 mb-6">
+        <div className="flex border-b border-neutral-800 gap-6 sm:gap-8 mb-6 overflow-x-auto hide-scrollbar whitespace-nowrap">
           <button
             onClick={() => setActiveTab('tournaments')}
             className={`pb-4 text-sm font-medium transition-colors border-b-2 ${
@@ -222,6 +243,14 @@ export default function AdminDashboard({
                 {transactions.length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`pb-4 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'settings' ? 'border-orange-500 text-orange-500' : 'border-transparent text-neutral-400 hover:text-white'
+            }`}
+          >
+            Admin Settings
           </button>
         </div>
 
@@ -441,7 +470,7 @@ export default function AdminDashboard({
             )}
           </div>
           </div>
-        ) : (
+        ) : activeTab === 'transactions' ? (
           <div className="space-y-6">
             {loading ? (
               <div className="flex items-center justify-center p-12 text-neutral-500">
@@ -455,23 +484,34 @@ export default function AdminDashboard({
               <div className="grid gap-4">
                 {transactions.map(tx => (
                   <div key={tx._id} className="bg-neutral-900 p-6 rounded-2xl border border-neutral-800 flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${
-                          tx.type === 'deposit' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
-                        }`}>
-                          {tx.type}
-                        </span>
-                        <span className="font-medium text-lg">₹{tx.amount}</span>
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${
+                            tx.type === 'deposit' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
+                          }`}>
+                            {tx.type}
+                          </span>
+                          <span className="font-medium text-lg">₹{tx.amount}</span>
+                        </div>
+                        <div className="text-sm text-neutral-400">
+                          User: {tx.userId?.name} ({tx.userId?.email})
+                        </div>
+                        <div className="text-sm text-neutral-500 mt-2">
+                          {tx.type === 'deposit' ? `UTR/TXN ID: ${tx.txnID}` : `UPI ID: ${tx.upiId || tx.txnID}`}
+                        </div>
                       </div>
-                      <div className="text-sm text-neutral-400">
-                        User: {tx.userId?.name} ({tx.userId?.email})
-                      </div>
-                      <div className="text-sm text-neutral-500 mt-2">
-                        {tx.type === 'deposit' ? `UTR/TXN ID: ${tx.txnID}` : `UPI ID: ${tx.upiId || tx.txnID}`}
-                      </div>
+                      
+                      {tx.type === 'deposit' && tx.proofImage && (
+                        <div className="ml-4 flex flex-col items-center">
+                          <span className="text-xs text-neutral-400 mb-2">Payment Proof</span>
+                          <a href={tx.proofImage} target="_blank" rel="noopener noreferrer">
+                            <img src={tx.proofImage} alt="Payment Proof" className="w-32 h-auto max-h-32 object-contain rounded-lg border border-neutral-800" />
+                          </a>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-col sm:flex-row">
                       <button 
                         onClick={() => handleTransactionAction(tx._id, 'approve')}
                         className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors"
@@ -490,7 +530,32 @@ export default function AdminDashboard({
               </div>
             )}
           </div>
-        )}
+        ) : activeTab === 'settings' ? (
+          <div className="max-w-2xl">
+            <div className="bg-neutral-900 p-6 rounded-2xl border border-neutral-800">
+              <h2 className="text-xl font-bold mb-6">Payment Settings</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-400 mb-1">Admin UPI ID</label>
+                  <p className="text-xs text-neutral-500 mb-2">Users will send deposits to this UPI ID.</p>
+                  <input 
+                    type="text" 
+                    value={adminUpiId}
+                    onChange={e => setAdminUpiId(e.target.value)}
+                    placeholder="e.g. admin@ybl"
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 outline-none focus:border-orange-500 transition-colors"
+                  />
+                </div>
+                <button 
+                  onClick={saveSettings}
+                  className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl transition-all"
+                >
+                  Save Settings
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

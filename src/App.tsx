@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { Trophy, Users, Shield, Wallet, Gamepad2, AlertCircle, ExternalLink } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Trophy, Users, Shield, Wallet, Gamepad2, AlertCircle, ExternalLink, Menu, X, Download } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import AdminDashboard from './components/AdminDashboard.tsx';
 import DepositForm from './components/DepositForm.tsx';
-import TournamentsList from './components/TournamentsList.tsx';
+import UserDashboard from './components/UserDashboard.tsx';
 import Login from './components/Login.tsx';
 
 function AppContent() {
@@ -22,6 +22,8 @@ function AppContent() {
   });
   const navigate = useNavigate();
 
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
   useEffect(() => {
     fetch('/api/health')
       .then(res => res.json())
@@ -30,7 +32,28 @@ function AppContent() {
         else setApiStatus('error');
       })
       .catch(() => setApiStatus('error'));
+
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    }
+  };
 
   const handleLaunchGame = () => {
     const intentUrl = 'intent://#Intent;scheme=com.garena.freefiremax;package=com.dts.freefiremax;end';
@@ -43,15 +66,75 @@ function AppContent() {
     }, 1500);
   };
 
-  const TopBar = () => (
-    <div className="bg-neutral-900 border-b border-neutral-800 px-6 py-3 flex justify-end items-center gap-4 h-16">
-      <Login 
-        user={currentUser} 
-        onLogin={(user) => setCurrentUser(user)} 
-        onLogout={() => { setCurrentUser(null); navigate('/login'); }} 
-      />
-    </div>
-  );
+  const TopBar = () => {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    return (
+      <div className="bg-neutral-900 border-b border-neutral-800 px-4 sm:px-6 py-3 sticky top-0 z-50">
+        <div className="max-w-screen-xl mx-auto flex justify-between items-center h-12">
+          <div className="flex items-center gap-2 font-bold text-lg text-orange-500">
+            <Gamepad2 size={24} />
+            <span className="hidden sm:inline">FF Tournaments</span>
+          </div>
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-4">
+            {deferredPrompt && (
+              <button 
+                onClick={handleInstallClick}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm font-semibold rounded-lg transition-all"
+              >
+                <Download size={16} /> Install App
+              </button>
+            )}
+            <Login 
+              user={currentUser} 
+              onLogin={(user) => setCurrentUser(user)} 
+              onLogout={() => { setCurrentUser(null); navigate('/login'); }} 
+            />
+          </div>
+
+          {/* Mobile Nav Toggle */}
+          <div className="flex md:hidden items-center gap-4">
+            <button 
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="p-2 text-neutral-400 hover:text-white"
+            >
+              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="md:hidden overflow-hidden border-t border-neutral-800 mt-3 pt-3 flex flex-col gap-4"
+            >
+              {deferredPrompt && (
+                <button 
+                  onClick={handleInstallClick}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl transition-all"
+                >
+                  <Download size={18} /> Install App
+                </button>
+              )}
+              <div className="flex justify-center">
+                <Login 
+                  user={currentUser} 
+                  onLogin={(user) => setCurrentUser(user)} 
+                  onLogout={() => { setCurrentUser(null); navigate('/login'); }} 
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white font-sans flex flex-col">
@@ -88,7 +171,10 @@ function AppContent() {
         
         <Route path="/admin" element={
           currentUser?.email === 'dhruvanth16189@gmail.com' ? (
-            <AdminDashboard userEmail={currentUser.email} onBack={() => navigate('/dashboard')} />
+            <>
+              <TopBar />
+              <AdminDashboard userEmail={currentUser.email} onBack={() => navigate('/dashboard')} />
+            </>
           ) : (
             <Navigate to={currentUser ? "/dashboard" : "/login"} replace />
           )
@@ -148,13 +234,13 @@ function AppContent() {
               </section>
 
               {/* Main Content */}
-              <main className="flex-1 max-w-5xl mx-auto px-6 py-12 w-full">
-                <TournamentsList userEmail={currentUser.email} />
+              <main className="flex-1 max-w-screen-xl mx-auto px-4 sm:px-6 py-8 md:py-12 w-full">
+                <UserDashboard userEmail={currentUser.email} />
               </main>
 
               {/* Stats */}
-              <footer className="py-12 border-t border-neutral-900 flex-shrink-0">
-                <div className="max-w-4xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+              <footer className="py-8 md:py-12 border-t border-neutral-900 flex-shrink-0">
+                <div className="max-w-screen-xl mx-auto px-4 sm:px-6 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-center">
                   <div>
                     <div className="text-2xl font-bold text-orange-500">10k+</div>
                     <div className="text-xs text-neutral-500 uppercase tracking-widest mt-1">Players</div>

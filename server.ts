@@ -7,6 +7,7 @@ import { connectDB } from './src/lib/db.ts';
 import { User } from './src/models/User.ts';
 import { Tournament } from './src/models/Tournament.ts';
 import { Transaction } from './src/models/Transaction.ts';
+import { PaymentSettings } from './src/models/PaymentSettings.ts';
 import { generateUPIDeepLink } from './src/services/upiService.ts';
 
 async function startServer() {
@@ -15,7 +16,7 @@ async function startServer() {
 
   // Middleware
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
 
   // Connect to MongoDB
   try {
@@ -29,18 +30,54 @@ async function startServer() {
     res.json({ status: 'ok', message: 'Free Fire Tournament API is running' });
   });
 
+  // Payment Settings (UPI ID)
+  app.get('/api/payment-settings', async (req, res) => {
+    try {
+      let settings = await PaymentSettings.findOne();
+      if (!settings) {
+        settings = await PaymentSettings.create({ upiId: 'admin@ybl' }); // Default
+      }
+      res.json(settings);
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  app.post('/api/admin/payment-settings', async (req, res) => {
+    try {
+      const { email, upiId } = req.body;
+      if (email !== 'dhruvanth16189@gmail.com') return res.status(403).json({ error: 'Unauthorized' });
+      
+      let settings = await PaymentSettings.findOne();
+      if (!settings) {
+        settings = await PaymentSettings.create({ upiId });
+      } else {
+        settings.upiId = upiId;
+        await settings.save();
+      }
+      res.json(settings);
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
   // UPI Link Generation
-  app.get('/api/upi-link', (req, res) => {
-    const amount = Number(req.query.amount) || 0;
-    const payeeVPA = 'admin@ybl'; // Replace with actual VPA in production
-    const link = generateUPIDeepLink(payeeVPA, amount);
-    res.json({ link, vpa: payeeVPA });
+  app.get('/api/upi-link', async (req, res) => {
+    try {
+      const amount = Number(req.query.amount) || 0;
+      const settings = await PaymentSettings.findOne();
+      const payeeVPA = settings ? settings.upiId : 'admin@ybl';
+      const link = generateUPIDeepLink(payeeVPA, amount);
+      res.json({ link, vpa: payeeVPA });
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
   });
 
   // Deposit Transaction Endpoint
   app.post('/api/transactions/deposit', async (req, res) => {
     try {
-      const { email, amount, txnID } = req.body;
+      const { email, amount, txnID, proofImage } = req.body;
       
       let user = await User.findOne({ email });
       // If user doesn't exist for test purposes, create one
@@ -56,7 +93,8 @@ async function startServer() {
         userId: user._id,
         type: 'deposit',
         amount: Number(amount),
-        txnID,
+        txnID: txnID || `dep-${Date.now()}`,
+        proofImage,
         status: 'pending'
       });
 
@@ -261,6 +299,33 @@ async function startServer() {
   });
 
   // Auth login endpoint
+  app.post('/api/transactions/withdraw', async (req, res) => {
+    try {
+      const { email, amount } = req.body;
+      const user = await User.findOne({ email });
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      
+      if (user.virtualBalance < Number(amount)) {
+        return res.status(400).json({ error: 'Insufficient balance' });
+      }
+      
+      user.virtualBalance -= Number(amount);
+      await user.save();
+      
+      const transaction = await Transaction.create({
+        userId: user._id,
+        type: 'withdraw',
+        amount: Number(amount),
+        status: 'pending'
+      });
+      
+      res.json(transaction);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
   app.post('/api/auth/login', async (req, res) => {
     try {
       const { email, displayName, uid } = req.body;
@@ -298,6 +363,19 @@ async function startServer() {
       }
       res.json(user);
     } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  app.get('/api/user/transactions', async (req, res) => {
+    try {
+      const email = req.query.email as string;
+      const user = await User.findOne({ email });
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      const transactions = await Transaction.find({ userId: user._id }).sort({ createdAt: -1 });
+      res.json(transactions);
+    } catch (err) {
+      console.error(err);
       res.status(500).json({ error: 'Server error' });
     }
   });

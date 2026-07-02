@@ -13,7 +13,7 @@ interface Tournament {
   registeredUsers: string[];
 }
 
-export default function TournamentsList({ userEmail }: { userEmail: string }) {
+export default function TournamentsList({ userEmail, filterMode = 'all', onBalanceUpdate }: { userEmail: string, filterMode?: 'all' | 'mine', onBalanceUpdate?: () => void }) {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState(0);
@@ -25,11 +25,14 @@ export default function TournamentsList({ userEmail }: { userEmail: string }) {
         fetch('/api/tournaments'),
         fetch(`/api/user/profile?email=${encodeURIComponent(userEmail)}`)
       ]);
-      if (tRes.ok) setTournaments(await tRes.json());
       if (uRes.ok) {
         const uData = await uRes.json();
         setBalance(uData.virtualBalance || 0);
         setUserId(uData._id);
+      }
+      if (tRes.ok) {
+        const allT = await tRes.json();
+        setTournaments(allT);
       }
     } catch (err) {
       console.error(err);
@@ -61,6 +64,7 @@ export default function TournamentsList({ userEmail }: { userEmail: string }) {
         if (res.ok) {
           alert('Successfully joined the tournament!');
           fetchData();
+          if (onBalanceUpdate) onBalanceUpdate();
         } else {
           const err = await res.json();
           alert(`Failed to join: ${err.error}`);
@@ -93,26 +97,24 @@ export default function TournamentsList({ userEmail }: { userEmail: string }) {
     );
   }
 
+  const displayedTournaments = filterMode === 'mine' ? tournaments.filter(t => t.registeredUsers.includes(userId)) : tournaments;
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-end mb-8">
         <div>
-          <h2 className="text-2xl font-bold mb-2">Upcoming Matches</h2>
-          <p className="text-neutral-400">Join a match and prove your skills</p>
-        </div>
-        <div className="text-right bg-neutral-900 border border-neutral-800 px-4 py-2 rounded-xl">
-          <div className="text-xs text-neutral-400">Your Balance</div>
-          <div className="text-lg font-bold text-orange-500">₹{balance}</div>
+          <h2 className="text-2xl font-bold mb-2">{filterMode === 'mine' ? 'My Matches' : 'Available Matches'}</h2>
+          <p className="text-neutral-400">{filterMode === 'mine' ? 'Matches you have joined' : 'Join a match and prove your skills'}</p>
         </div>
       </div>
 
-      {tournaments.length === 0 ? (
+      {displayedTournaments.length === 0 ? (
         <div className="text-center p-12 bg-neutral-900 rounded-2xl border border-neutral-800 text-neutral-500">
           No tournaments available at the moment.
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-6">
-          {tournaments.map((t) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {displayedTournaments.map((t) => (
             <motion.div 
               key={t._id}
               initial={{ opacity: 0, y: 10 }}

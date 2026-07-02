@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LogIn, Loader2, LogOut, User as UserIcon, Shield } from 'lucide-react';
-import { auth, provider, signInWithRedirect, getRedirectResult, onAuthStateChanged } from '../firebase';
+import { auth, provider, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
 interface LoginProps {
@@ -95,7 +95,12 @@ export default function Login({ onLogin, onLogout, user }: LoginProps) {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
     localStorage.removeItem('isAdmin');
     localStorage.removeItem('userProfile');
     onLogout();
