@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LogIn, Loader2, LogOut, User as UserIcon, Shield } from 'lucide-react';
-import { auth, provider, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from '../firebase';
+import { auth, provider, signInWithPopup, onAuthStateChanged, signOut } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
 interface LoginProps {
@@ -13,62 +13,51 @@ export default function Login({ onLogin, onLogout, user }: LoginProps) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const processFirebaseUser = async (firebaseUser: any) => {
-      setLoading(true);
-      try {
-        console.log("Processing firebase user: ", firebaseUser.email);
-        
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName,
-            uid: firebaseUser.uid
-          })
-        });
-        
-        if (res.ok) {
-          const userData = await res.json();
-          const profile = {
-            email: firebaseUser.email,
-            name: userData.username,
-            virtualBalance: userData.virtualBalance,
-            isAdmin: userData.isAdmin
-          };
-          onLogin(profile);
+  const processFirebaseUser = async (firebaseUser: any) => {
+    setLoading(true);
+    try {
+      console.log("Processing firebase user: ", firebaseUser.email);
+      
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          uid: firebaseUser.uid
+        })
+      });
+      
+      if (res.ok) {
+        const userData = await res.json();
+        const profile = {
+          email: firebaseUser.email,
+          name: userData.username,
+          virtualBalance: userData.virtualBalance,
+          isAdmin: userData.isAdmin
+        };
+        onLogin(profile);
 
-          if (firebaseUser.email === 'dhruvanth16189@gmail.com') {
-            localStorage.setItem('isAdmin', 'true');
-            localStorage.setItem('userProfile', JSON.stringify(profile));
-            navigate('/admin');
-          } else {
-            localStorage.setItem('userProfile', JSON.stringify(profile));
-            navigate('/dashboard');
-          }
+        if (firebaseUser.email === 'dhruvanth16189@gmail.com') {
+          localStorage.setItem('isAdmin', 'true');
+          localStorage.setItem('userProfile', JSON.stringify(profile));
         } else {
-          console.error('Failed to login to the server');
+          localStorage.setItem('userProfile', JSON.stringify(profile));
         }
-      } catch (err) {
-        console.error('Login error:', err);
-      } finally {
-        setLoading(false);
+        return profile;
+      } else {
+        console.error('Failed to login to the server');
+        return null;
       }
-    };
+    } catch (err) {
+      console.error('Login error:', err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result && result.user) {
-          await processFirebaseUser(result.user);
-        }
-      } catch (err) {
-        console.error('Redirect result error:', err);
-      }
-    };
-    
-    handleRedirectResult();
+  useEffect(() => {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser && !user) {
@@ -85,14 +74,25 @@ export default function Login({ onLogin, onLogout, user }: LoginProps) {
     return () => unsubscribe();
   }, [navigate, onLogin, user]);
 
-  const handleLogin = async () => {
+  const handleLogin = () => {
     setLoading(true);
-    try {
-      await signInWithRedirect(auth, provider);
-    } catch (err) {
-      console.error('Login error:', err);
-      setLoading(false);
-    }
+    signInWithPopup(auth, provider)
+      .then(async (result) => {
+        if (result && result.user) {
+          const profile = await processFirebaseUser(result.user);
+          if (profile) {
+            if (profile.email === 'dhruvanth16189@gmail.com') {
+              navigate('/admin');
+            } else {
+              navigate('/dashboard');
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Login error:', err);
+        setLoading(false);
+      });
   };
 
   const handleLogout = async () => {
