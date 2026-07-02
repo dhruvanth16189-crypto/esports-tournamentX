@@ -3,7 +3,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCXZskEshIvh_GrmxFPbe2cMwhv9HFov6M",
-  authDomain: "esports-tournamentx.firebaseapp.com",
+  authDomain: "esports-tournamentx.onrender.com",
   projectId: "esports-tournamentx",
   storageBucket: "esports-tournamentx.firebasestorage.app",
   messagingSenderId: "153967754678",
