@@ -9,7 +9,17 @@ import Login from './components/Login.tsx';
 
 function AppContent() {
   const [apiStatus, setApiStatus] = useState<'loading' | 'ok' | 'error'>('loading');
-  const [currentUser, setCurrentUser] = useState<any | null>(null);
+  const [currentUser, setCurrentUser] = useState<any | null>(() => {
+    const savedProfile = localStorage.getItem('userProfile');
+    if (savedProfile) {
+      try {
+        return JSON.parse(savedProfile);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -20,19 +30,6 @@ function AppContent() {
         else setApiStatus('error');
       })
       .catch(() => setApiStatus('error'));
-  }, []);
-
-  // Try to load user from local storage on mount
-  useEffect(() => {
-    const savedProfile = localStorage.getItem('userProfile');
-    if (savedProfile) {
-      try {
-        const profile = JSON.parse(savedProfile);
-        setCurrentUser(profile);
-      } catch (e) {
-        console.error('Failed to parse user profile', e);
-      }
-    }
   }, []);
 
   const handleLaunchGame = () => {
@@ -60,29 +57,33 @@ function AppContent() {
     <div className="min-h-screen bg-neutral-950 text-white font-sans flex flex-col">
       <Routes>
         <Route path="/login" element={
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <motion.h1 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-4xl md:text-6xl font-bold tracking-tight mb-8 bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent"
-            >
-              Free Fire Tournament
-            </motion.h1>
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-neutral-900 border border-neutral-800 p-8 rounded-2xl flex flex-col items-center gap-6 text-center max-w-md w-full"
-            >
-              <h2 className="text-xl font-semibold">Sign In Required</h2>
-              <p className="text-neutral-400 text-sm">Please sign in with your Google account to participate in tournaments, manage your balance, and access your dashboard.</p>
-              <Login 
-                user={currentUser} 
-                onLogin={(user) => setCurrentUser(user)} 
-                onLogout={() => { setCurrentUser(null); navigate('/login'); }} 
-              />
-            </motion.div>
-          </div>
+          currentUser ? (
+            <Navigate to={currentUser.email === 'dhruvanth16189@gmail.com' ? "/admin" : "/dashboard"} replace />
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <motion.h1 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-4xl md:text-6xl font-bold tracking-tight mb-8 bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent"
+              >
+                Free Fire Tournament
+              </motion.h1>
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-neutral-900 border border-neutral-800 p-8 rounded-2xl flex flex-col items-center gap-6 text-center max-w-md w-full"
+              >
+                <h2 className="text-xl font-semibold">Sign In Required</h2>
+                <p className="text-neutral-400 text-sm">Please sign in with your Google account to participate in tournaments, manage your balance, and access your dashboard.</p>
+                <Login 
+                  user={currentUser} 
+                  onLogin={(user) => setCurrentUser(user)} 
+                  onLogout={() => { setCurrentUser(null); navigate('/login'); }} 
+                />
+              </motion.div>
+            </div>
+          )
         } />
         
         <Route path="/admin" element={
