@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { LogIn, Loader2, LogOut, User as UserIcon, Shield } from 'lucide-react';
 import { auth, provider, signInWithPopup } from '../firebase';
+import { useNavigate } from 'react-router-dom';
 
 interface LoginProps {
   onLogin: (user: any) => void;
   onLogout: () => void;
-  onNavigate: (view: 'home' | 'admin' | 'deposit') => void;
   user: any | null;
 }
 
-export default function Login({ onLogin, onLogout, onNavigate, user }: LoginProps) {
+export default function Login({ onLogin, onLogout, user }: LoginProps) {
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogin = async () => {
     setLoading(true);
@@ -43,10 +44,11 @@ export default function Login({ onLogin, onLogout, onNavigate, user }: LoginProp
 
         if (firebaseUser.email === 'dhruvanth16189@gmail.com') {
           localStorage.setItem('isAdmin', 'true');
-          onNavigate('admin');
+          localStorage.setItem('userProfile', JSON.stringify(profile));
+          navigate('/admin');
         } else {
           localStorage.setItem('userProfile', JSON.stringify(profile));
-          onNavigate('home');
+          navigate('/dashboard');
         }
       } else {
         alert('Failed to login to the server');
@@ -62,7 +64,7 @@ export default function Login({ onLogin, onLogout, onNavigate, user }: LoginProp
     localStorage.removeItem('isAdmin');
     localStorage.removeItem('userProfile');
     onLogout();
-    onNavigate('home');
+    navigate('/login');
   };
 
   if (user) {
@@ -75,7 +77,7 @@ export default function Login({ onLogin, onLogout, onNavigate, user }: LoginProp
         
         {user.email === 'dhruvanth16189@gmail.com' ? (
           <button 
-            onClick={() => onNavigate('admin')}
+            onClick={() => navigate('/admin')}
             className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 rounded-lg text-sm font-medium transition-colors"
           >
             <Shield size={16} />
