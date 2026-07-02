@@ -1,0 +1,6 @@
+{
+  "name": "Free Fire Tournament",
+  "description": "A full-stack tournament management platform for Free Fire players, featuring match registrations, user balances, and administrative controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
