@@ -77,7 +77,7 @@ async function startServer() {
   // Deposit Transaction Endpoint
   app.post('/api/transactions/deposit', async (req, res) => {
     try {
-      const { email, amount, txnID, proofImage } = req.body;
+      const { email, amount, txnID } = req.body;
       
       let user = await User.findOne({ email });
       // If user doesn't exist for test purposes, create one
@@ -94,7 +94,6 @@ async function startServer() {
         type: 'deposit',
         amount: Number(amount),
         txnID: txnID || `dep-${Date.now()}`,
-        proofImage,
         status: 'pending'
       });
 
@@ -173,6 +172,45 @@ async function startServer() {
     }
   });
 
+  // Server Time Endpoint
+  app.get('/api/server-time', (req, res) => {
+    res.json({ serverTime: new Date().getTime() });
+  });
+
+  // Admin Force Start Tournament
+  app.post('/api/admin/tournaments/:id/force-start', async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (email !== 'dhruvanth16189@gmail.com') return res.status(403).json({ error: 'Unauthorized' });
+
+      const tournament = await Tournament.findById(req.params.id);
+      if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+      
+      tournament.matchStatus = 'ongoing';
+      await tournament.save();
+      res.json({ message: 'Tournament force started' });
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  // Admin Force End Tournament
+  app.post('/api/admin/tournaments/:id/force-end', async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (email !== 'dhruvanth16189@gmail.com') return res.status(403).json({ error: 'Unauthorized' });
+
+      const tournament = await Tournament.findById(req.params.id);
+      if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+      
+      tournament.matchStatus = 'completed';
+      await tournament.save();
+      res.json({ message: 'Tournament force ended' });
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
   // Public Tournaments Endpoint
   app.get('/api/tournaments', async (req, res) => {
     try {
@@ -195,6 +233,10 @@ async function startServer() {
 
       if (tournament.matchStatus !== 'scheduled') {
         return res.status(400).json({ error: 'Tournament is not open for registration' });
+      }
+
+      if (new Date(tournament.startTime).getTime() < new Date().getTime()) {
+        return res.status(400).json({ error: 'Tournament has already started' });
       }
 
       if (tournament.registeredUsers.includes(user._id)) {

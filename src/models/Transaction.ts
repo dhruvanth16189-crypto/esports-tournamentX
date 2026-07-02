@@ -7,7 +7,6 @@ export interface ITransaction extends Document {
   status: 'pending' | 'approved' | 'denied';
   txnID: string; // Also handles UTR
   upiId?: string; // For withdrawals
-  proofImage?: string; // Base64 or URL of payment proof
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,9 +25,8 @@ const TransactionSchema: Schema = new Schema(
       enum: ['pending', 'approved', 'denied'],
       default: 'pending',
     },
-    txnID: { type: String }, // Made optional if they upload proof
-    upiId: { type: String },
-    proofImage: { type: String },
+    txnID: { type: String, required: function(this: any) { return this.type === 'deposit'; } },
+    upiId: { type: String, required: function(this: any) { return this.type === 'withdraw'; } },
   },
   { timestamps: true }
 );

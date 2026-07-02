@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Shield, Plus, Trophy, ChevronRight, CheckCircle, ArrowLeft, Loader2, Calendar } from 'lucide-react';
+import { Shield, Plus, Trophy, ChevronRight, CheckCircle, ArrowLeft, Loader2, Calendar, Clock } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -37,7 +37,6 @@ interface Transaction {
   status: 'pending' | 'approved' | 'denied';
   txnID: string;
   upiId?: string;
-  proofImage?: string;
   createdAt: string;
 }
 
@@ -53,6 +52,7 @@ export default function AdminDashboard({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'tournaments' | 'transactions' | 'settings'>('tournaments');
   const [adminUpiId, setAdminUpiId] = useState('');
+  const [serverTime, setServerTime] = useState<number>(0);
   
   // Form State
   const [matchMode, setMatchMode] = useState<keyof typeof MATCH_MODES>('BR');
@@ -71,10 +71,11 @@ export default function AdminDashboard({
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [tRes, trRes, sRes] = await Promise.all([
+      const [tRes, trRes, sRes, timeRes] = await Promise.all([
         fetch(`/api/admin/tournaments?email=${encodeURIComponent(userEmail)}`),
         fetch(`/api/admin/transactions?email=${encodeURIComponent(userEmail)}`),
-        fetch('/api/payment-settings')
+        fetch('/api/payment-settings'),
+        fetch('/api/server-time')
       ]);
       
       if (tRes.ok) {
@@ -88,6 +89,10 @@ export default function AdminDashboard({
       if (sRes.ok) {
         const data = await sRes.json();
         if (data.upiId) setAdminUpiId(data.upiId);
+      }
+      if (timeRes.ok) {
+        const data = await timeRes.json();
+        setServerTime(data.serverTime);
       }
     } catch (err) {
       console.error(err);
@@ -171,6 +176,44 @@ export default function AdminDashboard({
     }
   };
 
+  const handleForceStart = async (tournamentId: string) => {
+    if (!confirm('Are you sure you want to force start this tournament?')) return;
+    
+    try {
+      const res = await fetch(`/api/admin/tournaments/${tournamentId}/force-start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail })
+      });
+      if (res.ok) {
+        fetchData();
+      } else {
+        alert('Failed to force start');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleForceEnd = async (tournamentId: string) => {
+    if (!confirm('Are you sure you want to force end this tournament without a winner?')) return;
+    
+    try {
+      const res = await fetch(`/api/admin/tournaments/${tournamentId}/force-end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail })
+      });
+      if (res.ok) {
+        fetchData();
+      } else {
+        alert('Failed to force end');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleTransactionAction = async (transactionId: string, action: 'approve' | 'deny') => {
     if (!confirm(`Are you sure you want to ${action} this transaction?`)) return;
 
@@ -217,8 +260,15 @@ export default function AdminDashboard({
               </div>
             </div>
           </div>
-          <div className="text-xs sm:text-sm bg-neutral-900 px-4 py-2 rounded-full border border-neutral-800 text-neutral-400 self-start sm:self-auto ml-14 sm:ml-0 overflow-hidden text-ellipsis max-w-full">
-            {userEmail}
+          <div className="flex flex-col sm:items-end gap-2 text-xs sm:text-sm ml-14 sm:ml-0">
+            <div className="bg-neutral-900 px-4 py-2 rounded-full border border-neutral-800 text-neutral-400 overflow-hidden text-ellipsis max-w-full">
+              {userEmail}
+            </div>
+            {serverTime > 0 && (
+              <div className="text-neutral-500 flex items-center gap-1">
+                <Clock size={14} /> Server Time: {new Date(serverTime).toLocaleTimeString()}
+              </div>
+            )}
           </div>
         </header>
 
@@ -422,8 +472,26 @@ export default function AdminDashboard({
                             {t.matchStatus}
                           </span>
                         </div>
-                        <div className="text-sm text-neutral-400">
+                        <div className="text-sm text-neutral-400 mb-2">
                           {new Date(t.startTime).toLocaleString()}
+                        </div>
+                        <div className="flex gap-2">
+                          {t.matchStatus === 'scheduled' && (
+                            <button
+                              onClick={() => handleForceStart(t._id)}
+                              className="text-xs px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-md transition-colors"
+                            >
+                              Force Start
+                            </button>
+                          )}
+                          {t.matchStatus === 'ongoing' && (
+                            <button
+                              onClick={() => handleForceEnd(t._id)}
+                              className="text-xs px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-md transition-colors"
+                            >
+                              Force End
+                            </button>
+                          )}
                         </div>
                       </div>
                       <div className="text-right">
@@ -501,15 +569,6 @@ export default function AdminDashboard({
                           {tx.type === 'deposit' ? `UTR/TXN ID: ${tx.txnID}` : `UPI ID: ${tx.upiId || tx.txnID}`}
                         </div>
                       </div>
-                      
-                      {tx.type === 'deposit' && tx.proofImage && (
-                        <div className="ml-4 flex flex-col items-center">
-                          <span className="text-xs text-neutral-400 mb-2">Payment Proof</span>
-                          <a href={tx.proofImage} target="_blank" rel="noopener noreferrer">
-                            <img src={tx.proofImage} alt="Payment Proof" className="w-32 h-auto max-h-32 object-contain rounded-lg border border-neutral-800" />
-                          </a>
-                        </div>
-                      )}
                     </div>
                     <div className="flex gap-2 flex-col sm:flex-row">
                       <button 

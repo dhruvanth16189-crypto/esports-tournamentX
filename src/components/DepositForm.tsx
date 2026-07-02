@@ -42,7 +42,8 @@ export default function DepositForm({ userEmail, onBack }: { userEmail: string; 
         setStatus('error');
       }
     } catch (err) {
-      setErrorMessage('Network error occurred');
+      console.error('Deposit error:', err);
+      setErrorMessage('Network error occurred during submission');
       setStatus('error');
     }
   };
@@ -135,13 +136,13 @@ export default function DepositForm({ userEmail, onBack }: { userEmail: string; 
           )}
 
           <div>
-            <label className="block text-sm font-medium text-neutral-400 mb-2">Transaction ID / UTR</label>
+            <label className="block text-sm font-medium text-neutral-400 mb-2">UTR / Transaction ID</label>
             <input 
               type="text"
               value={txnID}
               onChange={(e) => setTxnID(e.target.value)}
               className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 outline-none focus:border-orange-500 transition-colors"
-              placeholder="Enter 12-digit UTR number"
+              placeholder="Enter UTR or Transaction ID"
               required
             />
             <p className="text-xs text-neutral-500 mt-2">
