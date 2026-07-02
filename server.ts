@@ -117,9 +117,9 @@ async function startServer() {
         matchMode, subMode, entryFee, prizePool, startTime
       });
       res.json(tournament);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Create tournament error:', err);
-      res.status(500).json({ error: 'Server error' });
+      res.status(500).json({ error: 'Server error', details: err.message });
     }
   });
 

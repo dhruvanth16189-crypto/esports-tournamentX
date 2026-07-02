@@ -37,13 +37,12 @@ const TournamentSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-TournamentSchema.pre('validate', function(this: any, next: any) {
+TournamentSchema.pre('validate', function(this: any) {
   if (this.matchMode === 'LW') {
     if (this.subMode !== '1v1' && this.subMode !== '2v2') {
       this.invalidate('subMode', 'LW mode only allows 1v1 and 2v2 sub-modes.');
     }
   }
-  next();
 });
 
 export const Tournament = (mongoose.models.Tournament as mongoose.Model<ITournament>) || mongoose.model<ITournament>('Tournament', TournamentSchema);

@@ -415,6 +415,7 @@ export default function AdminDashboard({
                     }
                     .react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item {
                       background-color: #171717 !important;
+                      color: #fff !important;
                     }
                     .react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item:hover {
                       background-color: #262626 !important;
@@ -503,12 +504,12 @@ export default function AdminDashboard({
                     {/* Registered Users */}
                     <div className="border-t border-neutral-800 pt-6">
                       <h4 className="text-sm font-medium text-neutral-400 mb-4 uppercase tracking-wider">
-                        Registered Players ({t.registeredUsers?.length || 0})
+                        Registered Players ({(t.registeredUsers || []).length})
                       </h4>
                       
-                      {t.registeredUsers?.length > 0 ? (
+                      {(t.registeredUsers || []).length > 0 ? (
                         <div className="space-y-2">
-                          {t.registeredUsers.map(u => (
+                          {(t.registeredUsers || []).map(u => (
                             <div key={u._id} className="flex items-center justify-between p-3 bg-neutral-950 rounded-xl border border-neutral-800">
                               <div>
                                 <div className="font-medium">{u.name}</div>

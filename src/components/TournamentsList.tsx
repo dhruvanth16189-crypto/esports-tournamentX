@@ -160,16 +160,16 @@ export default function TournamentsList({ userEmail, filterMode = 'all', onBalan
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm text-neutral-400">
                     <Users size={16} />
-                    {t.registeredUsers.length} Players Registered
+                    {(t.registeredUsers || []).length} Players Registered
                   </div>
                   
                   {t.matchStatus === 'scheduled' && (
                     <button
                       onClick={() => handleJoin(t)}
-                      disabled={t.registeredUsers.includes(userId) || new Date(t.startTime).getTime() <= new Date().getTime()}
+                      disabled={(t.registeredUsers || []).includes(userId) || new Date(t.startTime).getTime() <= new Date().getTime()}
                       className="px-6 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 disabled:hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors active:scale-95"
                     >
-                      {t.registeredUsers.includes(userId) ? 'Joined' : new Date(t.startTime).getTime() <= new Date().getTime() ? 'Started' : 'Join Match'}
+                      {(t.registeredUsers || []).includes(userId) ? 'Joined' : new Date(t.startTime).getTime() <= new Date().getTime() ? 'Started' : 'Join Match'}
                     </button>
                   )}
                 </div>
