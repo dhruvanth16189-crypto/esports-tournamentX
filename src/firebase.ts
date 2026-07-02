@@ -1,9 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCXZskEshIvh_GrmxFPbe2cMwhv9HFov6M",
-  authDomain: "esports-tournamentx.onrender.com",
+  authDomain: "esports-tournamentx.firebaseapp.com",
   projectId: "esports-tournamentx",
   storageBucket: "esports-tournamentx.firebasestorage.app",
   messagingSenderId: "153967754678",
@@ -15,4 +15,4 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-export { app, auth, provider, signInWithPopup };
+export { app, auth, provider, signInWithRedirect, getRedirectResult };

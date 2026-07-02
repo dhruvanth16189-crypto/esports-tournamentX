@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LogIn, Loader2, LogOut, User as UserIcon, Shield } from 'lucide-react';
-import { auth, provider, signInWithPopup } from '../firebase';
+import { auth, provider, signInWithRedirect, getRedirectResult } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
 interface LoginProps {
@@ -13,49 +13,64 @@ export default function Login({ onLogin, onLogout, user }: LoginProps) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      setLoading(true);
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          const firebaseUser = result.user;
+          
+          console.log(firebaseUser.email);
+          
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName,
+              uid: firebaseUser.uid
+            })
+          });
+          
+          if (res.ok) {
+            const userData = await res.json();
+            const profile = {
+              email: firebaseUser.email,
+              name: userData.username,
+              virtualBalance: userData.virtualBalance,
+              isAdmin: userData.isAdmin
+            };
+            onLogin(profile);
+
+            if (firebaseUser.email === 'dhruvanth16189@gmail.com') {
+              localStorage.setItem('isAdmin', 'true');
+              localStorage.setItem('userProfile', JSON.stringify(profile));
+              navigate('/admin');
+            } else {
+              localStorage.setItem('userProfile', JSON.stringify(profile));
+              navigate('/dashboard');
+            }
+          } else {
+            alert('Failed to login to the server');
+          }
+        }
+      } catch (err) {
+        console.error('Login error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    handleRedirectResult();
+  }, [navigate, onLogin]);
+
   const handleLogin = async () => {
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
-      
-      // Log the user email upon successful login
-      console.log(firebaseUser.email);
-      
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          uid: firebaseUser.uid
-        })
-      });
-      
-      if (res.ok) {
-        const userData = await res.json();
-        const profile = {
-          email: firebaseUser.email,
-          name: userData.username,
-          virtualBalance: userData.virtualBalance,
-          isAdmin: userData.isAdmin
-        };
-        onLogin(profile);
-
-        if (firebaseUser.email === 'dhruvanth16189@gmail.com') {
-          localStorage.setItem('isAdmin', 'true');
-          localStorage.setItem('userProfile', JSON.stringify(profile));
-          navigate('/admin');
-        } else {
-          localStorage.setItem('userProfile', JSON.stringify(profile));
-          navigate('/dashboard');
-        }
-      } else {
-        alert('Failed to login to the server');
-      }
+      await signInWithRedirect(auth, provider);
     } catch (err) {
       console.error('Login error:', err);
-    } finally {
       setLoading(false);
     }
   };
